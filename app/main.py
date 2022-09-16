@@ -1,13 +1,13 @@
 from random import randrange
+from turtle import title
 from typing import List
-from pydantic import BaseModel
 from fastapi import FastAPI,status,HTTPException, Depends
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import time
 
 from sqlalchemy.orm import Session
-from . import models
+from . import models,schemas
 from .database import engine,get_db 
 
 models.Base.metadata.create_all(bind=engine)
@@ -16,10 +16,7 @@ app = FastAPI()
 
 
 
-class Post(BaseModel):
-    title: str
-    content: str
-    published: bool
+
 
 
 while True:
@@ -45,25 +42,27 @@ def find_post(id:int):
         if post['id'] == id:
             return post
 
-@app.get("/sql")
-def test_post(db: Session = Depends(get_db)):
-    return {"status","succuss"}
  
 @app.post("/posts",status_code=status.HTTP_201_CREATED)
-def create_post(post:Post):
-    cursor.execute("""INSERT INTO posts (title,content,published) VALUES(%s,%s,%s) RETURNING *; """,
-    (post.title,post.content,post.published))
-    new_post = cursor.fetchone()
-    con.commit()
+def create_post(post:schemas.PostCreate, db:Session = Depends(get_db)):
+    # cursor.execute("""INSERT INTO posts (title,content,published) VALUES(%s,%s,%s) RETURNING *; """,
+    # (post.title,post.content,post.published))
+    # new_post = cursor.fetchone()
+    # con.commit()
+
+    new_post = models.Post(**post.dict())
+    db.add(new_post)
+    db.commit()
+    db.refresh(new_post)
     return {"data":new_post}
 
 
 @app.get("/posts")
-def get_posts():
-    cursor.execute("""SELECT * FROM posts; """)
-    posts =  cursor.fetchall()
+def get_posts(db:Session = Depends(get_db)): 
+    # cursor.execute("""SELECT * FROM posts; """)
+    # posts =  cursor.fetchall()
+    posts = db.query(models.Post).all()
     return {"posts":posts}
-
 
 @app.get("/posts/latest")
 def get_latest_post():
@@ -72,21 +71,25 @@ def get_latest_post():
 
 
 @app.get("/posts/{id}")
-def get_post(id:int):
-    cursor.execute("""SELECT * FROM posts WHERE id=%s; """,(str(id)))
-    post = cursor.fetchone()
+def get_post(id:int,db:Session = Depends(get_db)):
+    # cursor.execute("""SELECT * FROM posts WHERE id=%s; """,(str(id)))
+    # post = cursor.fetchone()
+    post = db.query(models.Post).filter(models.Post.id == id).first()
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"post with id {id} not found")
     return post
 
 
 @app.delete("/posts/{id}",status_code=status.HTTP_204_NO_CONTENT)
-def delete_post(id:int):
-    cursor.execute("""DELETE FROM posts WHERE id=%s RETURNING *""",(str(id)))
-    post = cursor.fetchone()
-    con.commit()
-    if not post:
+def delete_post(id:int,db:Session = Depends(get_db)):
+    # cursor.execute("""DELETE FROM posts WHERE id=%s RETURNING *""",(str(id)))
+    # post = cursor.fetchone()
+    # con.commit()
+    post = db.query(models.Post).filter(models.Post.id == id)
+    if not post.first():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"post with id {id} not found")
+    post.delete(synchronize_session=False)
+    db.commit()
     return {"message","post successfully deleted"}
 
 
@@ -97,16 +100,21 @@ def find_post_index(id:int):
 
 
 @app.put("/posts/{id}")
-def update_post(id:int,post:Post):
-    cursor.execute("""UPDATE posts SET title=%s,content=%s,published=%s WHERE id=%s RETURNING *""",
-    (post.title,post.content,post.published,str(id)))
-    post_to_update = cursor.fetchone()
-    con.commit()
+def update_post(id:int,post:schemas.PostCreate,db:Session = Depends(get_db)):
+    # cursor.execute("""UPDATE posts SET title=%s,content=%s,published=%s WHERE id=%s RETURNING *""",
+    # (post.title,post.content,post.published,str(id)))
+    # post_to_update = cursor.fetchone()
+    # con.commit()
+    post_query = db.query(models.Post).filter(models.Post.id == id)
+    post_to_update = post_query.first()
+
     if not post_to_update:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"post with id {id} not found")
     # post_dict = post.dict()
     # post_dict['id'] = id
     # my_post[post_to_update] = post_dict
-    return post_to_update
+    post_query.update(post.dict(),synchronize_session=False)
+    db.commit()
+    return {"data": post_query.first()}
 
 
