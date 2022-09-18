@@ -43,7 +43,7 @@ def find_post(id:int):
             return post
 
  
-@app.post("/posts",status_code=status.HTTP_201_CREATED)
+@app.post("/posts",status_code=status.HTTP_201_CREATED, response_model=schemas.Post)
 def create_post(post:schemas.PostCreate, db:Session = Depends(get_db)):
     # cursor.execute("""INSERT INTO posts (title,content,published) VALUES(%s,%s,%s) RETURNING *; """,
     # (post.title,post.content,post.published))
@@ -54,15 +54,15 @@ def create_post(post:schemas.PostCreate, db:Session = Depends(get_db)):
     db.add(new_post)
     db.commit()
     db.refresh(new_post)
-    return {"data":new_post}
+    return new_post
 
 
-@app.get("/posts")
+@app.get("/posts",response_model=List[schemas.Post])
 def get_posts(db:Session = Depends(get_db)): 
     # cursor.execute("""SELECT * FROM posts; """)
     # posts =  cursor.fetchall()
     posts = db.query(models.Post).all()
-    return {"posts":posts}
+    return posts
 
 @app.get("/posts/latest")
 def get_latest_post():
@@ -70,7 +70,7 @@ def get_latest_post():
     return {"post":post}
 
 
-@app.get("/posts/{id}")
+@app.get("/posts/{id}", response_model=schemas.Post)
 def get_post(id:int,db:Session = Depends(get_db)):
     # cursor.execute("""SELECT * FROM posts WHERE id=%s; """,(str(id)))
     # post = cursor.fetchone()
@@ -99,7 +99,7 @@ def find_post_index(id:int):
         return index
 
 
-@app.put("/posts/{id}")
+@app.put("/posts/{id}", response_model=schemas.Post)
 def update_post(id:int,post:schemas.PostCreate,db:Session = Depends(get_db)):
     # cursor.execute("""UPDATE posts SET title=%s,content=%s,published=%s WHERE id=%s RETURNING *""",
     # (post.title,post.content,post.published,str(id)))
@@ -115,6 +115,16 @@ def update_post(id:int,post:schemas.PostCreate,db:Session = Depends(get_db)):
     # my_post[post_to_update] = post_dict
     post_query.update(post.dict(),synchronize_session=False)
     db.commit()
-    return {"data": post_query.first()}
+    return post_query.first()
+
+@app.post("/user", status_code=status.HTTP_201_CREATED)
+def create_user(user:schemas.UserCreate, db:Session = Depends(get_db)):
+    new_user = models.User(**user.dict())
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+
 
 
