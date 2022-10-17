@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from .. import models,schemas,oauth2
 from ..database import get_db 
 from typing import List, Optional
-from random import randrange
 
 router = APIRouter(prefix="/posts",tags=["Posts"])
 
