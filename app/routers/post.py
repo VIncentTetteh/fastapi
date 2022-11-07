@@ -1,4 +1,7 @@
+
+from turtle import pos
 from fastapi import status,HTTPException, Depends, APIRouter
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from .. import models,schemas,oauth2
 from ..database import get_db 
@@ -31,6 +34,10 @@ def get_posts(db:Session = Depends(get_db), current_user: int = Depends(oauth2.g
     # cursor.execute("""SELECT * FROM posts; """)
     # posts =  cursor.fetchall()
     posts = db.query(models.Post).filter(models.Post.title.contains(search)).limit(limit).offset(skip).all()
+    
+    # results = db.query(models.Post,func.count(models.Votes.post_id).label("votes")).join(models.Votes, models.Votes.post_id == models.Post.id, isouter=True).group_by(models.Post.id).all()
+
+    # print(results)
     return posts
 
 
